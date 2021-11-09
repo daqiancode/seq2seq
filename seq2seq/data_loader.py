@@ -1,3 +1,14 @@
+import os
+
+os.environ['OMP_NUM_THREADS'] = "16"
+os.environ['MKL_NUM_THREADS'] = "16"
+os.environ['KMP_AFFINITY'] = "scatter"
+os.environ['MKL_DYNAMIC'] = "false"
+# if GPU
+# os.environ["CUDA_DEVICE_ORDER"]="PCI_BUS_ID"
+# os.environ["CUDA_VISIBLE_DEVICES"]="0"
+
+
 from collections import Counter
 import torch
 import nltk
@@ -28,9 +39,9 @@ def load_data(in_file):
     with open(in_file, 'r') as f:
         for line in f:
             parts = line.strip().split("\t")
-            en.append(["BOS"] + nltk.word_tokenize(parts[0].lower()) + ["EOS"])
+            en.append([BOS] + nltk.word_tokenize(parts[0].lower()) + [EOS])
             # 没有分词
-            cn.append(["BOS"] + list(parts[1]) + ["EOS"])
+            cn.append([BOS] + list(parts[1]) + [EOS])
     return en, cn
 
 
@@ -47,14 +58,17 @@ def build_dict(sentences, max_words=500):
     topn = counter.most_common(max_words)
     total_words = len(topn) + 2
     word_dict = {word[0]: i + 2 for i, word in enumerate(topn)}
-    word_dict[PAD_IDX] = PAD
-    word_dict[UNK_IDX] = UNK
+    word_dict[PAD] = PAD_IDX
+    word_dict[UNK] = UNK_IDX
     return word_dict, total_words
 
 
 # word -> index
 en_dict, en_total_words = build_dict(train_en, 5000)
 cn_dict, cn_total_words = build_dict(train_cn, 5000)
+
+cn_bos_idx = cn_dict[BOS]
+cn_eos_idx = cn_dict[EOS]
 
 print(f"en vocabulary size:{en_total_words}")
 print(f"cn vocabulary size:{cn_total_words}")
@@ -70,7 +84,7 @@ def encode_sentences(sents, word_dict: dict):
 
 def decode_sentences(sents, word_dict_rev: dict):
     sents = sents.numpy()
-    return [[word_dict_rev.get(w , UNK) for w in s] for s in sents]
+    return [[word_dict_rev.get(w, UNK) for w in s] for s in sents]
 
 
 def sort_sentences(en_sents, cn_sents):
@@ -113,9 +127,11 @@ class LanguageLoader:
         return self.batch_count
 
     def __next__(self):
-        self._batch_index = self._batch_index % len(self)
+        if self._batch_index > self.batch_count:
+            raise StopIteration()
         r = self.get_batch(self._batch_index)
         self._batch_index += 1
+
         return r
 
     def __iter__(self):
@@ -127,17 +143,16 @@ train_dataloader = LanguageLoader(train_file, batch_size=20)
 test_dataloader = LanguageLoader(test_file, batch_size=20)
 
 
-
 def decode_sents(sentences, is_cn=True):
     word_dict_rev = cn_dict_rev if is_cn else en_dict_rev
     r = decode_sentences(sentences, word_dict_rev=word_dict_rev)
     decoded_sents = []
     for v in r:
         sent = []
-        for x in v :
+        for x in v:
             if x == EOS:
                 break
-            if x in [BOS , PAD]:
+            if x in [BOS, PAD]:
                 continue
             sent.append(x)
         if is_cn:
@@ -147,9 +162,12 @@ def decode_sents(sentences, is_cn=True):
     return decoded_sents
 
 
-
 if __name__ == '__main__':
-    for en, en_lens, cn, cn_lens in train_dataloader:
-        print(decode_sentences(en, word_dict_rev=en_dict_rev))
-        print(decode_sentences(cn, word_dict_rev=cn_dict_rev))
+    print(len(train_dataloader))
+    for i, (en, en_len, cn, cn_len) in enumerate(train_dataloader):
+        print(i)
+        print(decode_sents(en, False))
+        print(decode_sents(cn))
+        print(decode_sentences(cn , cn_dict_rev))
         exit(0)
+        # print(i)
