@@ -170,4 +170,3 @@ if __name__ == '__main__':
         print(decode_sents(cn))
         print(decode_sentences(cn , cn_dict_rev))
         exit(0)
-        # print(i)

@@ -192,7 +192,7 @@ def eval():
     print("Evaluation loss", total_loss / total_num_words)
 
 
-def train(num_epoch=1):
+def train(num_epoch=10):
     print(torch.__config__.parallel_info())
     for epoch in range(num_epoch):
         model.train()

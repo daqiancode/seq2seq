@@ -113,7 +113,7 @@ def train_epoch():
         # batch_size和embedding_size是固定的，句子长度不固定，把句子长度做个第一个维度方便处理。
         src = src.transpose(0, 1)
         tgt = tgt.transpose(0, 1)
-        # 去掉最后一个字符
+        # 去掉最后一个字符, input:[BOS,w1,w2] -> output:[w1,w2,BOS]
         tgt_input = tgt[:-1, :]
 
         src_mask, tgt_mask, src_padding_mask, tgt_padding_mask = create_mask(src, tgt_input)
